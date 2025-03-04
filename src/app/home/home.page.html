@@ -1,0 +1,31 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Dashboard</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-segment [(ngModel)]="tipoDeChartSeleccionado" (ionChange)="segmentChanged($event)">
+    <ion-segment-button value="bar-chart">
+      <ion-label>Bar Chart</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="line-chart">
+      <ion-label>Line Chart</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="pie-chart">
+      <ion-label>Pie Chart</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  <ng-container *ngIf="tipoDeChartSeleccionado === 'bar-chart'">
+    <app-bar-chart [backgroundColorCat]="backgroundColorCat" [borderColorCat]="borderColorCat"></app-bar-chart>
+  </ng-container>
+
+  <ng-container *ngIf="tipoDeChartSeleccionado === 'line-chart'">
+    <app-line-chart></app-line-chart>
+  </ng-container>
+
+  <ng-container *ngIf="tipoDeChartSeleccionado === 'pie-chart'">
+    <app-pie-chart></app-pie-chart>
+  </ng-container>
+</ion-content>
