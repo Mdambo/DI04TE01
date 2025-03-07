@@ -1,105 +1,132 @@
-import { Component, OnInit, Input } from '@angular/core';
-import { Chart } from 'chart.js/auto';
-import { NoticiasService } from 'src/app/servicios/noticias.service';
+import { Component, OnInit, Renderer2, ElementRef, Input } from '@angular/core';
+import { Chart, ChartType } from 'chart.js/auto';
+import { GestionApiService } from 'src/app/servicios/gestion-api.service';
 
 @Component({
   selector: 'app-bar-chart',
   templateUrl: './bar-chart.component.html',
   styleUrls: ['./bar-chart.component.scss'],
-  standalone: false
+  standalone: false,
 })
 export class BarChartComponent implements OnInit {
-  @Input() backgroundColorCat: string[] = [];
-  @Input() borderColorCat: string[] = [];
+  @Input() datosCategorias: number[] = [];
+  @Input() nombresCategorias: string[] = [];
+  @Input() backgroundColorCategorias: string[] = [];
+  @Input() borderColorCategorias: string[] = [];
+  @Input() tipoChartSelected: string = "";
 
-  public chart: Chart | undefined;
-  public apiData: { categoria: string, totalResults: number }[] = [];
-  public isDataLoaded: boolean = false;  // Bandera para controlar si los datos están cargados
+  // Atributo que almacena los datos del chart
+  public chart!: Chart;
 
-  constructor(private noticiasService: NoticiasService) {}
+  // Este es el objeto donde se almacenan los datos de la API
+  public apiData: { categoria: string; totalResults: number }[] = [];
 
-  ngOnInit() {
-    // Realizamos la consulta API cuando la página se carga
-    this.fetchDataAndInitializeChart();
+  constructor(private el: ElementRef, private renderer: Renderer2, private gestionServiceApi: GestionApiService) {}
 
-    // Nos suscribimos a los datos del servicio
-    this.noticiasService.apiData$.subscribe(data => {
-      if (data.length > 0) {
-        this.apiData = data;
-        this.isDataLoaded = true;  // Cambiamos la bandera a 'true' cuando los datos están disponibles
-        this.actualizarChart();  // Actualizamos el gráfico con los nuevos datos
+  ngOnInit(): void {
+    console.log("Ejecuta bar-chart");
+    this.inicializarChart();
+
+    // Nos suscribimos al BehaviorSubject para recibir los datos de la API
+    this.gestionServiceApi.datos$.subscribe((datos) => {
+      if (datos != undefined) {
+        // Cuando recibimos un valor, actualizamos apiData
+        this.apiData.push({ categoria: datos.categoria, totalResults: datos.totalResults });
+        // Actualizamos el gráfico con los nuevos valores
+        this.actualizarChart();
       }
     });
   }
 
-  // Método para obtener los datos de la API y actualizar el gráfico
-  fetchDataAndInitializeChart() {
-    const categorias = ['business', 'entertainment', 'general', 'technology', 'health', 'science', 'sports'];
-    this.noticiasService.cogerNoticias(categorias); // Llamada al servicio para obtener los datos
-    this.iniciarGrafico(); // Inicializamos el gráfico con datos vacíos al principio
-  }
+  // Método para inicializar el gráfico
+  private inicializarChart() {
+    const data = {
+      labels: this.nombresCategorias,
+      datasets: [{
+        label: 'Gráfico de barras',
+        data: this.datosCategorias,
+        fill: false,
+        backgroundColor: this.backgroundColorCategorias,
+        borderColor: this.borderColorCategorias,
+        borderWidth: 1
+      }]
+    };
 
-  // Método para iniciar la gráfica cuando no hay datos
-  iniciarGrafico() {
-    this.chart = new Chart('barCanvas', {
-      type: 'bar',
-      data: {
-        labels: [],  // Inicialmente vacío
-        datasets: []  // Inicialmente vacío
-      },
+    const canvas = this.renderer.createElement('canvas');
+    this.renderer.setAttribute(canvas, 'id', 'barChart');
+    const container = this.el.nativeElement.querySelector('#contenedor-barchart');
+    this.renderer.appendChild(container, canvas);
+
+    this.chart = new Chart(canvas, {
+      type: 'bar' as ChartType,
+      data: data,
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         scales: {
           y: {
             beginAtZero: true
+          },
+          x: {
+            // Aseguramos que las categorías se distribuyan correctamente en el eje X
+            ticks: {
+              autoSkip: false
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            labels: {
+              boxWidth: 0,
+              font: {
+                size: 16,
+                weight: 'bold'
+              }
+            }
           }
         }
       }
     });
+
+    this.chart.canvas.width = 100;
+    this.chart.canvas.height = 100;
   }
 
-  // Método para actualizar la gráfica con los datos recibidos de la API
-  actualizarChart() {
-    const datasetsByCompany: { [key: string]: any } = {};
+  // Método para actualizar el gráfico con los datos recibidos de la API
+  private actualizarChart() {
+    const datasetsByCompany: { [key: string]: { label: string; data: number[]; backgroundColor: string[]; borderColor: string[]; borderWidth: number } } = {};
 
+    // Inicializamos las etiquetas para las categorías
+    const categorias = this.apiData.map(row => row.categoria);
+
+    // Recorremos apiData para actualizar los datos del gráfico
     this.apiData.forEach((row, index) => {
       const categoria = row.categoria;
       const totalResults = row.totalResults;
 
-      // Si no existe el dataset para esa categoría, lo creamos
+      // Si no hemos pintado aún los datos de esta categoría, inicializamos su objeto en datasetsByCompany
       if (!datasetsByCompany[categoria]) {
         datasetsByCompany[categoria] = {
           label: 'Valores de ' + categoria,
-          data: [],
-          backgroundColor: [this.backgroundColorCat[index]],
-          borderColor: [this.borderColorCat[index]],
+          data: new Array(this.apiData.length).fill(0), // Inicializamos los valores de data con 0
+          backgroundColor: [this.backgroundColorCategorias[index]],
+          borderColor: [this.borderColorCategorias[index]],
           borderWidth: 1
         };
       }
 
-      datasetsByCompany[categoria].data.push(totalResults);
+      // Actualizamos los valores de la categoría
+      const categoryIndex = categorias.indexOf(categoria); // Encontramos el índice de la categoría
+      datasetsByCompany[categoria].data[categoryIndex] = totalResults; // Asignamos el valor a la categoría correspondiente
     });
 
-    // Si ya existe un gráfico, lo destruimos para evitar que se dibuje otro
-    if (this.chart) {
-      this.chart.destroy();
-    }
+    // Actualizamos las labels con las categorías
+    this.chart.data.labels = categorias;
 
-    // Creamos un nuevo gráfico con los datos actualizados
-    this.chart = new Chart('barCanvas', {
-      type: 'bar',
-      data: {
-        labels: this.apiData.map(row => row.categoria),  // Labels de las categorías
-        datasets: Object.values(datasetsByCompany)  // Los datasets con los resultados
-      },
-      options: {
-        responsive: true,
-        scales: {
-          y: {
-            beginAtZero: true
-          }
-        }
-      }
-    });
+    // Modificamos los datasets para reflejar correctamente los valores de las categorías
+    this.chart.data.datasets = Object.values(datasetsByCompany);
+
+    // Actualizamos el gráfico con los nuevos datos
+    this.chart.update();
   }
 }

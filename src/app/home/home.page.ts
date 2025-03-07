@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { NoticiasService } from '../servicios/noticias.service';
+import { GestionApiService } from '../servicios/gestion-api.service';
 
 @Component({
   selector: 'app-home',
@@ -14,16 +14,22 @@ export class HomePage implements OnInit {
   categorias: string[] = ["business","entertainment","general","technology","health","science","sports"];
   tipoDeChartSeleccionado: string = "bar-chart";
 
-  constructor(private noticiasService: NoticiasService) {}
+  constructor(public gestionServiceApi: GestionApiService) {}
 
   ngOnInit() {
-    this.noticiasService.cogerNoticias(this.categorias);
+    //Mediante el array de categorias, llamamos a la API una vez por cada categoría.
+    this.categorias.forEach(categoria => {
+      this.gestionServiceApi.cargarCategoria(categoria);
+    });
   }
 
+  //Gestionamos el cambio de segmento
   segmentChanged(event: any) {
+    //Recogemos el tipo de chart (bar-chart, line-chart o pie-chart), mediante event.detail.value
     this.tipoDeChartSeleccionado = event.detail.value;
-    if (this.tipoDeChartSeleccionado === "bar-chart") {
-      this.noticiasService.cogerNoticias(this.categorias);
-    }
+
+      this.categorias.forEach(categoria => {
+        this.gestionServiceApi.cargarCategoria(categoria);
+      });
   }
 }
